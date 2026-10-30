@@ -110,7 +110,11 @@ final class GameScene: SKScene {
 
     private let world = SKNode()
     private let player = SKNode()
+    private let avatar = SKNode()               // phần lắc lư của nhân vật
     private let cat = SKLabelNode(text: "🐱")
+    private let face = SKSpriteNode()            // ảnh khuôn mặt người chơi (nếu có)
+    private var wobble: CGFloat = 0
+    private var wobbleVel: CGFloat = 0
     private let playerShadow = SKShapeNode(ellipseOf: CGSize(width: 180, height: 40))
     private var lanterns: [Decor] = []
     private var lanternTemplate = SKNode()
@@ -129,6 +133,25 @@ final class GameScene: SKScene {
     private let progressBack = SKSpriteNode(color: UIColor(white: 1, alpha: 0.2), size: CGSize(width: 500, height: 14))
     private let progressFill = SKSpriteNode(color: .systemYellow, size: CGSize(width: 500, height: 14))
     private let recalibButton = GameScene.makeLabel(size: 34)
+    private let faceButton = GameScene.makeLabel(size: 34)
+
+    /// Màn chọn nhân vật gọi khi xong; game chỉ bắt đầu hiệu chỉnh sau đó.
+    private var avatarChosen = false
+    /// Gọi khi người chơi bấm "Đổi nhân vật" ở màn hết ván.
+    var onChangeFace: (() -> Void)?
+
+    func setFace(_ image: UIImage?) {
+        if let image {
+            face.texture = SKTexture(image: image)
+            face.size = CGSize(width: 210, height: 210)
+        }
+        face.isHidden = image == nil
+        cat.isHidden = image != nil
+        touchMode = false
+        avatarChosen = true
+        show(nil)
+        enter(.waiting)
+    }
     private let flash = SKSpriteNode(color: .systemRed, size: .zero)
 
     private static func makeLabel(size: CGFloat) -> SKLabelNode {
@@ -397,7 +420,12 @@ final class GameScene: SKScene {
         cat.fontSize = 170
         cat.verticalAlignmentMode = .bottom
         cat.position = CGPoint(x: 0, y: -18)
-        player.addChild(cat)
+        avatar.addChild(cat)
+        face.anchorPoint = CGPoint(x: 0.5, y: 0)
+        face.position = CGPoint(x: 0, y: -6)
+        face.isHidden = true
+        avatar.addChild(face)
+        player.addChild(avatar)
         player.zPosition = 100
         world.addChild(player)
     }
@@ -475,6 +503,13 @@ final class GameScene: SKScene {
         recalibButton.isHidden = true
         addChild(recalibButton)
 
+        faceButton.text = "🙂 Đổi nhân vật"
+        faceButton.fontColor = .systemYellow
+        faceButton.position = CGPoint(x: cx, y: 80)
+        faceButton.zPosition = 601
+        faceButton.isHidden = true
+        addChild(faceButton)
+
         flash.size = size
         flash.position = CGPoint(x: cx, y: size.height / 2)
         flash.alpha = 0
@@ -491,6 +526,7 @@ final class GameScene: SKScene {
         levelSamples.removeAll()
         calibPeak = -80
         recalibButton.isHidden = next != .gameOver
+        faceButton.isHidden = next != .gameOver
     }
 
     override func update(_ currentTime: TimeInterval) {
@@ -503,6 +539,7 @@ final class GameScene: SKScene {
 
         switch phase {
         case .waiting:
+            guard avatarChosen else { break }
             // Thiếu micro vẫn chơi được bằng camera (chạm giữa màn hình để nhảy).
             if let problem = hub.cameraProblem {
                 show("Cần quyền camera", problem + "\nChạm màn hình để chơi thử bằng cảm ứng.")
@@ -729,14 +766,25 @@ final class GameScene: SKScene {
                 jumpY = 0
                 jumpV = 0
                 airborne = false
-                cat.run(.sequence([.scaleX(to: 1.15, y: 0.85, duration: 0.06), .scale(to: 1, duration: 0.12)]))
+                avatar.run(.sequence([.scaleX(to: 1.18, y: 0.82, duration: 0.06), .scale(to: 1, duration: 0.14)]))
             }
         }
 
         let x = cx + laneX * laneW0
         let bob = (phase == .playing && !airborne) ? abs(sin(CGFloat(now) * 11)) * 10 : 0
         player.position = CGPoint(x: x, y: groundY0 + jumpY * unitPx0 + bob)
-        player.zRotation = max(-0.3, min(0.3, -laneVel * 0.08))
+
+        // Lắc lư: một lò xo lỏng bị kéo theo hướng đổi làn nên nghiêng rồi đung đưa qua lại,
+        // cộng thêm nhịp lắc nhẹ theo bước chạy.
+        let lean = max(-0.35, min(0.35, -laneVel * 0.1))
+        wobbleVel += ((lean - wobble) * 110 - wobbleVel * 5) * dt
+        wobble += wobbleVel * dt
+        let running = phase == .playing && !airborne
+        let sway = running ? sin(CGFloat(now) * 11) * 0.09 : 0
+        avatar.zRotation = wobble + sway
+        if !avatar.hasActions() {
+            avatar.yScale = running ? 1 + sin(CGFloat(now) * 22) * 0.035 : 1
+        }
         playerShadow.position = CGPoint(x: x, y: groundY0)
         playerShadow.setScale(1 / (1 + jumpY * 0.6))
 
@@ -857,6 +905,7 @@ final class GameScene: SKScene {
         let now = CACurrentMediaTime()
         switch phase {
         case .waiting, .calibStill, .calibLeft, .calibRight, .calibShout:
+            guard avatarChosen else { return }
             touchMode = true
             startCountdown(resume: false)
         case .playing:
@@ -867,7 +916,12 @@ final class GameScene: SKScene {
             if !airborne { startJump(0.5, now) }
         case .gameOver:
             guard now - gameOverTime > 1 else { return }
-            if recalibButton.frame.insetBy(dx: -40, dy: -30).contains(p) {
+            if faceButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
+                avatarChosen = false
+                show(nil)
+                enter(.waiting)
+                onChangeFace?()
+            } else if recalibButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
                 touchMode = false
                 show(nil)
                 enter(hub.cameraReady ? .calibStill : .waiting)
