@@ -11,7 +11,8 @@ struct ContentView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            SpriteView(scene: scene, preferredFramesPerSecond: 60)
+            // ignoresSiblingOrder: thứ tự vẽ chỉ theo zPosition, SpriteKit gom lệnh vẽ được nhiều hơn.
+            SpriteView(scene: scene, preferredFramesPerSecond: 60, options: [.ignoresSiblingOrder])
                 .ignoresSafeArea()
 
             // Khung camera nhỏ để người chơi biết mình còn trong hình.

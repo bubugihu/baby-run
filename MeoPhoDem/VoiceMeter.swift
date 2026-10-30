@@ -1,6 +1,7 @@
 import AVFoundation
+import Accelerate
 
-/// Đo âm lượng micro liên tục (không ghi âm), cập nhật ~45 lần/giây.
+/// Đo âm lượng micro liên tục (không ghi âm), cập nhật ~100 lần/giây.
 final class VoiceMeter {
     static let shared = VoiceMeter()
 
@@ -26,6 +27,8 @@ final class VoiceMeter {
         do {
             // .measurement tắt tự động chỉnh âm lượng để độ to tiếng hét được đo đúng.
             try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .mixWithOthers, .allowAirPlay])
+            // Bộ đệm nhỏ → tiếng hét tới game sớm hơn (~10 ms thay vì ~23 ms).
+            try? audioSession.setPreferredIOBufferDuration(0.01)
             try audioSession.setActive(true)
         } catch {
             fail("Không mở được micro: \(error.localizedDescription)")
@@ -39,13 +42,12 @@ final class VoiceMeter {
             return
         }
 
-        input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+        input.installTap(onBus: 0, bufferSize: 512, format: format) { buffer, _ in
             guard let samples = buffer.floatChannelData?[0] else { return }
             let count = Int(buffer.frameLength)
             guard count > 0 else { return }
-            var sum: Float = 0
-            for i in 0..<count { sum += samples[i] * samples[i] }
-            let rms = (sum / Float(count)).squareRoot()
+            var rms: Float = 0
+            vDSP_rmsqv(samples, 1, &rms, vDSP_Length(count))
             let db = 20 * log10(max(rms, 0.000_01))
             DispatchQueue.main.async { InputHub.shared.levelDB = db }
         }

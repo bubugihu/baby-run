@@ -2,7 +2,7 @@ import AVFoundation
 import Vision
 import QuartzCore
 
-/// Camera trước + Vision body pose → vị trí thân người, ~20 lần/giây.
+/// Camera trước + Vision body pose → vị trí thân người, mỗi khung hình camera (~30 lần/giây).
 final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     static let shared = BodyTracker()
 
@@ -10,7 +10,6 @@ final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     private let sessionQueue = DispatchQueue(label: "body.session")
     private let videoQueue = DispatchQueue(label: "body.video")
     private let request = VNDetectHumanBodyPoseRequest()
-    private var lastProcess: CFTimeInterval = 0
     private var started = false
 
     private var output: AVCaptureVideoDataOutput?
@@ -84,9 +83,9 @@ final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        // Xử lý mọi khung hình: hàng đợi tuần tự + alwaysDiscardsLateVideoFrames tự bỏ
+        // khung cũ nếu Vision chưa xong, nên không bị dồn trễ.
         let now = CACurrentMediaTime()
-        guard now - lastProcess >= 1.0 / 20 else { return }
-        lastProcess = now
 
         let handler = VNImageRequestHandler(cmSampleBuffer: sampleBuffer, orientation: .up, options: [:])
         guard (try? handler.perform([request])) != nil else { return }
