@@ -107,11 +107,12 @@ final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
 
         let handler = VNImageRequestHandler(cmSampleBuffer: sampleBuffer, orientation: .up, options: [:])
         guard (try? handler.perform([request])) != nil else { return }
-        let point = Self.bodyCenter(of: Self.mainPerson(request.results ?? []))
+        let body = Self.bodyCenter(of: Self.mainPerson(request.results ?? []))
 
         DispatchQueue.main.async {
-            guard let point else { return }
-            InputHub.shared.bodyPoint = point
+            guard let body else { return }
+            InputHub.shared.bodyPoint = body.point
+            InputHub.shared.fullBodyVisible = body.fullBody
             InputHub.shared.lastBodyTime = now
         }
     }
@@ -130,7 +131,8 @@ final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
     }
 
     /// Ưu tiên hông (ổn định nhất khi bước ngang), không có thì dùng vai/cổ.
-    private static func bodyCenter(of person: VNHumanBodyPoseObservation?) -> CGPoint? {
+    /// `fullBody` = thấy cả hông lẫn đầu gối, tức là người đứng đủ xa.
+    private static func bodyCenter(of person: VNHumanBodyPoseObservation?) -> (point: CGPoint, fullBody: Bool)? {
         guard let person, let points = try? person.recognizedPoints(.all) else { return nil }
         func joint(_ name: VNHumanBodyPoseObservation.JointName) -> CGPoint? {
             guard let p = points[name], p.confidence > 0.3 else { return nil }
@@ -138,9 +140,11 @@ final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         }
         func mid(_ a: CGPoint, _ b: CGPoint) -> CGPoint { CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2) }
 
-        if let root = joint(.root) { return root }
-        if let l = joint(.leftHip), let r = joint(.rightHip) { return mid(l, r) }
-        if let l = joint(.leftShoulder), let r = joint(.rightShoulder) { return mid(l, r) }
-        return joint(.neck)
+        let fullBody = (joint(.leftHip) != nil || joint(.rightHip) != nil)
+            && (joint(.leftKnee) != nil || joint(.rightKnee) != nil)
+        if let root = joint(.root) { return (root, fullBody) }
+        if let l = joint(.leftHip), let r = joint(.rightHip) { return (mid(l, r), fullBody) }
+        if let l = joint(.leftShoulder), let r = joint(.rightShoulder) { return (mid(l, r), false) }
+        return joint(.neck).map { ($0, false) }
     }
 }

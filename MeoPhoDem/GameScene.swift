@@ -80,6 +80,7 @@ final class GameScene: SKScene {
     private var calibCenter = CGPoint(x: 0.5, y: 0.5)
     private var calibLeftPoint = CGPoint.zero
     private var calibNote: String?
+    private var stillAnchor: CGPoint?
 
     private var targetLane = 1
     private var laneX: CGFloat = 0
@@ -124,6 +125,7 @@ final class GameScene: SKScene {
     private let scoreLabel = GameScene.makeLabel(size: 50)
     private let livesLabel = GameScene.makeLabel(size: 46)
     private var laneSlots: [SKShapeNode] = []
+    private var shownSlotLane = -1
     private let laneDot = SKShapeNode(circleOfRadius: 9)
     private let volumeFill = SKSpriteNode(color: .systemGreen, size: CGSize(width: 40, height: 300))
     private let volumeThreshold = SKSpriteNode(color: .systemOrange, size: CGSize(width: 60, height: 5))
@@ -204,7 +206,7 @@ final class GameScene: SKScene {
             star.fillColor = .white
             star.strokeColor = .clear
             star.alpha = CGFloat.random(in: 0.3...0.8)
-            star.position = CGPoint(x: .random(in: 0...size.width), y: .random(in: (horizonY + 120)...size.height))
+            star.position = CGPoint(x: CGFloat.random(in: 0...size.width), y: CGFloat.random(in: (horizonY + 120)...size.height))
             star.zPosition = -99
             backdrop.addChild(star)
         }
@@ -242,7 +244,7 @@ final class GameScene: SKScene {
                     if Int.random(in: 0..<3) == 0 {
                         let window = SKSpriteNode(color: windowColor, size: CGSize(width: 10, height: 13))
                         window.anchorPoint = .zero
-                        window.alpha = .random(in: 0.4...0.9)
+                        window.alpha = CGFloat.random(in: 0.4...0.9)
                         window.position = CGPoint(x: wx, y: wy)
                         window.zPosition = 1
                         building.addChild(window)
@@ -255,7 +257,7 @@ final class GameScene: SKScene {
                 let (text, color) = signs[signIndex]
                 signIndex += 1
                 let sign = SKLabelNode(fontNamed: "HiraginoSans-W6")
-                sign.text = text.map(String.init).joined(separator: "\n")
+                sign.text = text.map { String($0) }.joined(separator: "\n")
                 sign.numberOfLines = 0
                 sign.fontSize = 28
                 sign.fontColor = color
@@ -614,7 +616,7 @@ final class GameScene: SKScene {
     private let skipHint = "\n(Chạm màn hình để bỏ qua và chơi bằng cảm ứng)"
 
     private func notVisibleYet() -> Double {
-        show("Chưa thấy bạn", "Đứng cách iPad khoảng 2 mét để camera thấy cả người." + skipHint)
+        show("Lùi ra xa khoảng 2 mét", "Đứng sao cho camera thấy cả người, từ đầu tới đầu gối." + skipHint)
         phaseStart = CACurrentMediaTime()
         pointSamples.removeAll()
         levelSamples.removeAll()
@@ -623,6 +625,22 @@ final class GameScene: SKScene {
 
     private func runCalibStill(_ now: TimeInterval, _ elapsed: TimeInterval) -> Double {
         guard hub.bodyVisible(at: now), let point = hub.bodyPoint else { return notVisibleYet() }
+        // Vừa chụp ảnh xong người chơi còn đứng sát iPad: chỉ đo khi đã thấy cả người
+        // và đứng yên, nếu không vị trí "giữa" sẽ bị lấy sai lúc đang lùi ra.
+        guard hub.fullBodyVisible else {
+            stillAnchor = nil
+            return notVisibleYet()
+        }
+        if let anchor = stillAnchor, hypot(point.x - anchor.x, point.y - anchor.y) < 0.03 {
+            // vẫn đứng yên
+        } else {
+            stillAnchor = point
+            phaseStart = now
+            pointSamples.removeAll()
+            levelSamples.removeAll()
+            show("Bước 1/4 · Đứng yên ở GIỮA", "Giữ im lặng 3 giây để đo tiếng ồn trong phòng." + skipHint)
+            return 0
+        }
         pointSamples.append(point)
         levelSamples.append(level)
         show("Bước 1/4 · Đứng yên ở GIỮA", "Giữ im lặng 3 giây để đo tiếng ồn trong phòng." + skipHint)
@@ -630,6 +648,7 @@ final class GameScene: SKScene {
             calibCenter = mean(pointSamples)
             calib.noiseDB = percentile(levelSamples, 0.9)
             calibNote = nil
+            stillAnchor = nil
             enter(.calibLeft)
         }
         return elapsed / 3
@@ -968,11 +987,13 @@ final class GameScene: SKScene {
         progressFill.xScale = CGFloat(min(max(progress ?? 0, 0), 1))
 
         let calibrated = phase != .waiting && phase != .calibStill && phase != .calibLeft && phase != .calibRight
-        for (i, slot) in laneSlots.enumerated() {
-            let color: UIColor = i == targetLane ? .systemYellow : UIColor(white: 1, alpha: 0.22)
-            if slot.fillColor != color { slot.fillColor = color }
-            slot.isHidden = !calibrated
+        if shownSlotLane != targetLane {
+            shownSlotLane = targetLane
+            for (i, slot) in laneSlots.enumerated() {
+                slot.fillColor = i == targetLane ? .systemYellow : UIColor(white: 1, alpha: 0.22)
+            }
         }
+        for slot in laneSlots { slot.isHidden = !calibrated }
         if calibrated, !touchMode, hub.bodyVisible(at: now), let point = hub.bodyPoint {
             let t = max(-1.6, min(1.6, calib.projection(point)))
             laneDot.isHidden = false

@@ -1,4 +1,5 @@
 import AVFoundation
+import UIKit
 import Accelerate
 
 /// Đo âm lượng micro liên tục (không ghi âm), cập nhật ~100 lần/giây.
@@ -35,6 +36,33 @@ final class VoiceMeter {
             return
         }
 
+        // Bật AirPlay/đổi tai nghe làm engine dừng; cuộc gọi hay Siri làm micro bị ngắt.
+        // Cả hai trường hợp đều khởi động lại để tiếng hét không "mất" giữa ván.
+        let center = NotificationCenter.default
+        center.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            self?.restart()
+        }
+        center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+            guard let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+            self?.restart()
+        }
+        center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self, InputHub.shared.micReady, !self.engine.isRunning else { return }
+            self.restart()
+        }
+
+        startEngine()
+    }
+
+    private func restart() {
+        engine.stop()
+        engine.inputNode.removeTap(onBus: 0)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        startEngine()
+    }
+
+    private func startEngine() {
         let input = engine.inputNode
         let format = input.outputFormat(forBus: 0)
         guard format.sampleRate > 0, format.channelCount > 0 else {
