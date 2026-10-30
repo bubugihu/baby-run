@@ -110,9 +110,15 @@ final class GameScene: SKScene {
 
     private let world = SKNode()
     private let player = SKNode()
+    private let avatar = SKNode()               // phần lắc lư của nhân vật
     private let cat = SKLabelNode(text: "🐱")
+    private let face = SKSpriteNode()            // ảnh khuôn mặt người chơi (nếu có)
+    private var wobble: CGFloat = 0
+    private var wobbleVel: CGFloat = 0
     private let playerShadow = SKShapeNode(ellipseOf: CGSize(width: 180, height: 40))
     private var lanterns: [Decor] = []
+    private var lanternTemplate = SKNode()
+    private var crateTemplate = SKNode()
     private var dashes: [Decor] = []
 
     private let scoreLabel = GameScene.makeLabel(size: 50)
@@ -127,6 +133,25 @@ final class GameScene: SKScene {
     private let progressBack = SKSpriteNode(color: UIColor(white: 1, alpha: 0.2), size: CGSize(width: 500, height: 14))
     private let progressFill = SKSpriteNode(color: .systemYellow, size: CGSize(width: 500, height: 14))
     private let recalibButton = GameScene.makeLabel(size: 34)
+    private let faceButton = GameScene.makeLabel(size: 34)
+
+    /// Màn chọn nhân vật gọi khi xong; game chỉ bắt đầu hiệu chỉnh sau đó.
+    private var avatarChosen = false
+    /// Gọi khi người chơi bấm "Đổi nhân vật" ở màn hết ván.
+    var onChangeFace: (() -> Void)?
+
+    func setFace(_ image: UIImage?) {
+        if let image {
+            face.texture = SKTexture(image: image)
+            face.size = CGSize(width: 210, height: 210)
+        }
+        face.isHidden = image == nil
+        cat.isHidden = image != nil
+        touchMode = false
+        avatarChosen = true
+        show(nil)
+        enter(.waiting)
+    }
     private let flash = SKSpriteNode(color: .systemRed, size: .zero)
 
     private static func makeLabel(size: CGFloat) -> SKLabelNode {
@@ -143,9 +168,9 @@ final class GameScene: SKScene {
         built = true
         backgroundColor = UIColor(red: 0.08, green: 0.08, blue: 0.13, alpha: 1)
         addChild(world)
-        buildBackground()
-        buildRoad()
-        buildDecor()
+        buildBackground(view)
+        buildRoad(view)
+        buildDecor(view)
         buildPlayer()
         buildHUD()
         layoutDecor()
@@ -162,7 +187,9 @@ final class GameScene: SKScene {
         return SKTexture(image: image)
     }
 
-    private func buildBackground() {
+    private func buildBackground(_ view: SKView) {
+        // Trời, sao, trăng, dãy nhà: dựng bằng nhiều node rồi gộp thành một ảnh duy nhất.
+        let backdrop = SKNode()
         let skySize = CGSize(width: size.width, height: size.height - horizonY)
         let sky = SKSpriteNode(texture: gradientTexture(size: skySize,
                                                         top: UIColor(red: 0.04, green: 0.06, blue: 0.19, alpha: 1),
@@ -170,7 +197,7 @@ final class GameScene: SKScene {
         sky.size = skySize
         sky.position = CGPoint(x: cx, y: horizonY + skySize.height / 2)
         sky.zPosition = -100
-        world.addChild(sky)
+        backdrop.addChild(sky)
 
         for _ in 0..<40 {
             let star = SKShapeNode(circleOfRadius: CGFloat.random(in: 1...2.2))
@@ -179,7 +206,7 @@ final class GameScene: SKScene {
             star.alpha = CGFloat.random(in: 0.3...0.8)
             star.position = CGPoint(x: .random(in: 0...size.width), y: .random(in: (horizonY + 120)...size.height))
             star.zPosition = -99
-            world.addChild(star)
+            backdrop.addChild(star)
         }
 
         let moonGlow = SKShapeNode(circleOfRadius: 90)
@@ -190,8 +217,9 @@ final class GameScene: SKScene {
         moon.strokeColor = .clear
         moonGlow.position = CGPoint(x: size.width * 0.8, y: size.height * 0.86)
         moonGlow.zPosition = -98
+        moon.zPosition = 1
         moonGlow.addChild(moon)
-        world.addChild(moonGlow)
+        backdrop.addChild(moonGlow)
 
         // Dãy nhà phía chân trời, cửa sổ sáng đèn ngẫu nhiên.
         let buildingColor = UIColor(red: 0.06, green: 0.08, blue: 0.18, alpha: 1)
@@ -206,7 +234,7 @@ final class GameScene: SKScene {
             building.anchorPoint = CGPoint(x: 0, y: 0)
             building.position = CGPoint(x: x, y: horizonY)
             building.zPosition = -90
-            world.addChild(building)
+            backdrop.addChild(building)
             var wy: CGFloat = 14
             while wy < h - 20 {
                 var wx: CGFloat = 10
@@ -216,6 +244,7 @@ final class GameScene: SKScene {
                         window.anchorPoint = .zero
                         window.alpha = .random(in: 0.4...0.9)
                         window.position = CGPoint(x: wx, y: wy)
+                        window.zPosition = 1
                         building.addChild(window)
                     }
                     wx += 22
@@ -237,9 +266,28 @@ final class GameScene: SKScene {
             }
             x += w + 4
         }
+        let baked = bake(backdrop, in: view)
+        baked.zPosition = -100
+        world.addChild(baked)
     }
 
-    private func buildRoad() {
+    /// Vẽ một cụm node thành một sprite duy nhất (ở độ phân giải `detail` lần) để SpriteKit
+    /// gom được lệnh vẽ. SKShapeNode và hàng trăm node nhỏ là nguyên nhân giật hình phổ biến nhất.
+    private func bake(_ node: SKNode, in view: SKView, detail: CGFloat = 2) -> SKNode {
+        let holder = SKNode()
+        holder.setScale(detail)
+        holder.addChild(node)
+        let frame = holder.calculateAccumulatedFrame()
+        guard frame.width > 0, frame.height > 0, let texture = view.texture(from: holder) else {
+            node.removeFromParent()
+            return node
+        }
+        let sprite = SKSpriteNode(texture: texture, size: CGSize(width: frame.width / detail, height: frame.height / detail))
+        sprite.anchorPoint = CGPoint(x: -frame.minX / frame.width, y: -frame.minY / frame.height)
+        return sprite
+    }
+
+    private func buildRoad(_ view: SKView) {
         // Mép đường là đường thẳng hội tụ về điểm biến mất (cx, horizonY).
         let s0 = horizonY / (horizonY - groundY0)
         func trapezoid(halfWidth: CGFloat) -> CGPath {
@@ -253,18 +301,23 @@ final class GameScene: SKScene {
         let sidewalk = SKShapeNode(path: trapezoid(halfWidth: roadHalf0 * 1.4))
         sidewalk.fillColor = UIColor(red: 0.15, green: 0.15, blue: 0.23, alpha: 1)
         sidewalk.strokeColor = .clear
-        sidewalk.zPosition = -60
-        world.addChild(sidewalk)
+        let ground = SKNode()
+        ground.addChild(sidewalk)
 
         let road = SKShapeNode(path: trapezoid(halfWidth: roadHalf0))
         road.fillColor = UIColor(red: 0.18, green: 0.18, blue: 0.26, alpha: 1)
         road.strokeColor = UIColor(white: 1, alpha: 0.25)
         road.lineWidth = 3
-        road.zPosition = -50
-        world.addChild(road)
+        road.zPosition = 1
+        ground.addChild(road)
+        let baked = bake(ground, in: view, detail: 1)
+        baked.zPosition = -50
+        world.addChild(baked)
     }
 
-    private func buildDecor() {
+    private func buildDecor(_ view: SKView) {
+        lanternTemplate = bake(makeLantern(), in: view)
+        crateTemplate = bake(makeCrate(), in: view)
         // Vạch chia làn.
         for side in [CGFloat(-0.5), 0.5] {
             var z: CGFloat = -1
@@ -280,7 +333,7 @@ final class GameScene: SKScene {
         for side in [CGFloat(-1), 1] {
             var z: CGFloat = 0.5
             while z < 32 {
-                let lantern = makeLantern()
+                let lantern = lanternTemplate.copy() as! SKNode
                 world.addChild(lantern)
                 lanterns.append(Decor(node: lantern, z: z, side: side))
                 z += 4
@@ -292,11 +345,11 @@ final class GameScene: SKScene {
         let node = SKNode()
         let pole = SKSpriteNode(color: UIColor(red: 0.23, green: 0.16, blue: 0.12, alpha: 1), size: CGSize(width: 8, height: 260))
         pole.anchorPoint = CGPoint(x: 0.5, y: 0)
+        pole.zPosition = 1
         node.addChild(pole)
         let glow = SKShapeNode(circleOfRadius: 80)
         glow.fillColor = UIColor(red: 1, green: 0.7, blue: 0.28, alpha: 0.18)
         glow.strokeColor = .clear
-        glow.blendMode = .add
         glow.position = CGPoint(x: 0, y: 270)
         node.addChild(glow)
         let body = SKShapeNode(ellipseOf: CGSize(width: 52, height: 68))
@@ -304,10 +357,12 @@ final class GameScene: SKScene {
         body.strokeColor = UIColor(red: 0.5, green: 0.08, blue: 0.06, alpha: 1)
         body.lineWidth = 3
         body.position = CGPoint(x: 0, y: 270)
+        body.zPosition = 2
         node.addChild(body)
         for y in [CGFloat(236), 304] {
             let cap = SKSpriteNode(color: UIColor(white: 0.12, alpha: 1), size: CGSize(width: 28, height: 6))
             cap.position = CGPoint(x: 0, y: y)
+            cap.zPosition = 3
             node.addChild(cap)
         }
         return node
@@ -334,12 +389,14 @@ final class GameScene: SKScene {
         lid.fillColor = UIColor(red: 0.69, green: 0.48, blue: 0.27, alpha: 1)
         lid.strokeColor = dark
         lid.lineWidth = 4
+        lid.zPosition = 1
         node.addChild(lid)
 
         let box = SKShapeNode(rect: CGRect(x: -w / 2, y: 0, width: w, height: h), cornerRadius: 6)
         box.fillColor = UIColor(red: 0.55, green: 0.36, blue: 0.2, alpha: 1)
         box.strokeColor = dark
         box.lineWidth = 6
+        box.zPosition = 2
         node.addChild(box)
 
         let planks = CGMutablePath()
@@ -349,6 +406,7 @@ final class GameScene: SKScene {
         let lines = SKShapeNode(path: planks)
         lines.strokeColor = dark
         lines.lineWidth = 6
+        lines.zPosition = 3
         node.addChild(lines)
         return node
     }
@@ -362,7 +420,12 @@ final class GameScene: SKScene {
         cat.fontSize = 170
         cat.verticalAlignmentMode = .bottom
         cat.position = CGPoint(x: 0, y: -18)
-        player.addChild(cat)
+        avatar.addChild(cat)
+        face.anchorPoint = CGPoint(x: 0.5, y: 0)
+        face.position = CGPoint(x: 0, y: -6)
+        face.isHidden = true
+        avatar.addChild(face)
+        player.addChild(avatar)
         player.zPosition = 100
         world.addChild(player)
     }
@@ -440,6 +503,13 @@ final class GameScene: SKScene {
         recalibButton.isHidden = true
         addChild(recalibButton)
 
+        faceButton.text = "🙂 Đổi nhân vật"
+        faceButton.fontColor = .systemYellow
+        faceButton.position = CGPoint(x: cx, y: 80)
+        faceButton.zPosition = 601
+        faceButton.isHidden = true
+        addChild(faceButton)
+
         flash.size = size
         flash.position = CGPoint(x: cx, y: size.height / 2)
         flash.alpha = 0
@@ -456,6 +526,7 @@ final class GameScene: SKScene {
         levelSamples.removeAll()
         calibPeak = -80
         recalibButton.isHidden = next != .gameOver
+        faceButton.isHidden = next != .gameOver
     }
 
     override func update(_ currentTime: TimeInterval) {
@@ -468,6 +539,7 @@ final class GameScene: SKScene {
 
         switch phase {
         case .waiting:
+            guard avatarChosen else { break }
             // Thiếu micro vẫn chơi được bằng camera (chạm giữa màn hình để nhảy).
             if let problem = hub.cameraProblem {
                 show("Cần quyền camera", problem + "\nChạm màn hình để chơi thử bằng cảm ứng.")
@@ -694,14 +766,25 @@ final class GameScene: SKScene {
                 jumpY = 0
                 jumpV = 0
                 airborne = false
-                cat.run(.sequence([.scaleX(to: 1.15, y: 0.85, duration: 0.06), .scale(to: 1, duration: 0.12)]))
+                avatar.run(.sequence([.scaleX(to: 1.18, y: 0.82, duration: 0.06), .scale(to: 1, duration: 0.14)]))
             }
         }
 
         let x = cx + laneX * laneW0
         let bob = (phase == .playing && !airborne) ? abs(sin(CGFloat(now) * 11)) * 10 : 0
         player.position = CGPoint(x: x, y: groundY0 + jumpY * unitPx0 + bob)
-        player.zRotation = max(-0.3, min(0.3, -laneVel * 0.08))
+
+        // Lắc lư: một lò xo lỏng bị kéo theo hướng đổi làn nên nghiêng rồi đung đưa qua lại,
+        // cộng thêm nhịp lắc nhẹ theo bước chạy.
+        let lean = max(-0.35, min(0.35, -laneVel * 0.1))
+        wobbleVel += ((lean - wobble) * 110 - wobbleVel * 5) * dt
+        wobble += wobbleVel * dt
+        let running = phase == .playing && !airborne
+        let sway = running ? sin(CGFloat(now) * 11) * 0.09 : 0
+        avatar.zRotation = wobble + sway
+        if !avatar.hasActions() {
+            avatar.yScale = running ? 1 + sin(CGFloat(now) * 22) * 0.035 : 1
+        }
         playerShadow.position = CGPoint(x: x, y: groundY0)
         playerShadow.setScale(1 / (1 + jumpY * 0.6))
 
@@ -750,7 +833,7 @@ final class GameScene: SKScene {
             lanes.append(([0, 1, 2].filter { $0 != lanes[0] }).randomElement()!)
         }
         for lane in lanes {
-            let node = makeCrate()
+            let node = crateTemplate.copy() as! SKNode
             node.alpha = 0
             world.addChild(node)
             obstacles.append(Obstacle(node: node, lane: lane, z: Tune.spawnZ))
@@ -822,6 +905,7 @@ final class GameScene: SKScene {
         let now = CACurrentMediaTime()
         switch phase {
         case .waiting, .calibStill, .calibLeft, .calibRight, .calibShout:
+            guard avatarChosen else { return }
             touchMode = true
             startCountdown(resume: false)
         case .playing:
@@ -832,7 +916,12 @@ final class GameScene: SKScene {
             if !airborne { startJump(0.5, now) }
         case .gameOver:
             guard now - gameOverTime > 1 else { return }
-            if recalibButton.frame.insetBy(dx: -40, dy: -30).contains(p) {
+            if faceButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
+                avatarChosen = false
+                show(nil)
+                enter(.waiting)
+                onChangeFace?()
+            } else if recalibButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
                 touchMode = false
                 show(nil)
                 enter(hub.cameraReady ? .calibStill : .waiting)
@@ -870,8 +959,9 @@ final class GameScene: SKScene {
 
     private func updateHUD(_ now: TimeInterval, progress: Double?) {
         let showScore = phase == .playing || phase == .countdown || phase == .paused || phase == .gameOver
-        scoreLabel.text = showScore ? "Điểm: \(score)" : ""
-        livesLabel.text = showScore ? String(repeating: "❤️" as String, count: max(lives, 0)) + String(repeating: "🤍" as String, count: Tune.lives - max(lives, 0)) : ""
+        // Chỉ gán chữ khi đổi: mỗi lần gán, SKLabelNode phải vẽ lại chữ thành ảnh.
+        setText(scoreLabel, showScore ? "Điểm: \(score)" : "")
+        setText(livesLabel, showScore ? String(repeating: "❤️" as String, count: max(lives, 0)) + String(repeating: "🤍" as String, count: Tune.lives - max(lives, 0)) : "")
 
         progressBack.isHidden = progress == nil || messagePanel.isHidden
         progressFill.isHidden = progressBack.isHidden
@@ -879,7 +969,8 @@ final class GameScene: SKScene {
 
         let calibrated = phase != .waiting && phase != .calibStill && phase != .calibLeft && phase != .calibRight
         for (i, slot) in laneSlots.enumerated() {
-            slot.fillColor = i == targetLane ? .systemYellow : UIColor(white: 1, alpha: 0.22)
+            let color: UIColor = i == targetLane ? .systemYellow : UIColor(white: 1, alpha: 0.22)
+            if slot.fillColor != color { slot.fillColor = color }
             slot.isHidden = !calibrated
         }
         if calibrated, !touchMode, hub.bodyVisible(at: now), let point = hub.bodyPoint {
@@ -899,6 +990,10 @@ final class GameScene: SKScene {
     }
 
     // MARK: - Tiện ích
+
+    private func setText(_ label: SKLabelNode, _ text: String) {
+        if label.text != text { label.text = text }
+    }
 
     private func mean(_ points: [CGPoint]) -> CGPoint {
         guard !points.isEmpty else { return CGPoint(x: 0.5, y: 0.5) }

@@ -8,24 +8,35 @@ struct ContentView: View {
         scene.scaleMode = .aspectFill
         return scene
     }()
+    @State private var choosingFace = true
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            SpriteView(scene: scene, preferredFramesPerSecond: 60)
+            // ignoresSiblingOrder: thứ tự vẽ chỉ theo zPosition, SpriteKit gom lệnh vẽ được nhiều hơn.
+            SpriteView(scene: scene, preferredFramesPerSecond: 60, options: [.ignoresSiblingOrder])
                 .ignoresSafeArea()
 
-            // Khung camera nhỏ để người chơi biết mình còn trong hình.
-            CameraPreview(session: BodyTracker.shared.session)
-                .frame(width: 220, height: 165)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.6), lineWidth: 2))
-                .padding(24)
-                .allowsHitTesting(false)
+            if choosingFace {
+                FacePicker { face in
+                    scene.setFace(face)
+                    choosingFace = false
+                }
+            } else {
+                // Khung camera nhỏ để người chơi biết mình còn trong hình.
+                // Chỉ một khung camera hiện ra mỗi lúc (màn chọn nhân vật có khung riêng).
+                CameraPreview(session: BodyTracker.shared.session)
+                    .frame(width: 220, height: 165)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(.white.opacity(0.6), lineWidth: 2))
+                    .padding(24)
+                    .allowsHitTesting(false)
+            }
         }
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
+            scene.onChangeFace = { choosingFace = true }
             BodyTracker.shared.start()
             VoiceMeter.shared.start()
         }
