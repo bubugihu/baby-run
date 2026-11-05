@@ -112,7 +112,7 @@ struct ModeMenu: View {
                 .ignoresSafeArea()
             VStack(spacing: 40) {
                 VStack(spacing: 10) {
-                    Text("bu học")
+                    Text("Bu chơi")
                         .font(.system(size: 64, weight: .heavy, design: .rounded))
                     Text("Chọn trò chơi · chơi bằng cả cơ thể")
                         .font(.system(size: 24, weight: .semibold))

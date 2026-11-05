@@ -16,13 +16,8 @@ final class InputHub {
     var handsTime: CFTimeInterval = 0
     /// Tăng 1 mỗi khi có khung hình camera mới đã xử lý (để game biết có mẫu tay mới).
     var handsFrame = 0
-    /// Âm lượng hiện tại, dBFS (khoảng -80 im lặng tới 0 rất to).
-    var levelDB: Float = -80
-
     var cameraReady = false
-    var micReady = false
     var cameraProblem: String?
-    var micProblem: String?
 
     func bodyVisible(at now: CFTimeInterval) -> Bool {
         bodyPoint != nil && now - lastBodyTime < 0.6

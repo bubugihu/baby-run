@@ -1,4 +1,4 @@
-# bu học 🐱🏮
+# Bu chơi 🐱🏮
 
 App trò chơi vận động cho iPad, điều khiển bằng cả cơ thể qua camera trước. Mở app sẽ thấy màn **chọn chế độ**:
 

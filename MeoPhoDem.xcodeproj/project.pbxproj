@@ -172,8 +172,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "bu học";
+				INFOPLIST_KEY_CFBundleDisplayName = "Bu chơi";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera dùng để nhận ra động tác của bạn (bước sang trái/phải, vung tay). Hình ảnh chỉ xử lý trên iPad, không gửi đi đâu.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -201,8 +202,9 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "bu học";
+				INFOPLIST_KEY_CFBundleDisplayName = "Bu chơi";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera dùng để nhận ra động tác của bạn (bước sang trái/phải, vung tay). Hình ảnh chỉ xử lý trên iPad, không gửi đi đâu.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

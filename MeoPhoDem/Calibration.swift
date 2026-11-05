@@ -8,14 +8,6 @@ struct Calibration {
     private(set) var leftT: CGFloat = -1
     private(set) var rightT: CGFloat = 1
 
-    var noiseDB: Float = -50
-    var shoutDB: Float = -15
-
-    /// Mức to cần vượt để tính là một tiếng hét.
-    var jumpThresholdDB: Float {
-        noiseDB + max(8, (shoutDB - noiseDB) * 0.45)
-    }
-
     /// Lưu 3 vị trí. Trả về false nếu trái và phải không nằm hai bên vị trí giữa.
     mutating func setPositions(center: CGPoint, left: CGPoint, right: CGPoint) -> Bool {
         let newAxis = CGVector(dx: right.x - left.x, dy: right.y - left.y)

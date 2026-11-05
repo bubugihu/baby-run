@@ -27,11 +27,11 @@ final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
-                    if granted { self.configureAndRun() } else { self.fail("Chưa cho phép camera. Vào Cài đặt → bu học → bật Camera.") }
+                    if granted { self.configureAndRun() } else { self.fail("Chưa cho phép camera. Vào Cài đặt → Bu chơi → bật Camera.") }
                 }
             }
         default:
-            fail("Chưa cho phép camera. Vào Cài đặt → bu học → bật Camera.")
+            fail("Chưa cho phép camera. Vào Cài đặt → Bu chơi → bật Camera.")
         }
     }
 

@@ -1,9 +1,9 @@
-# Kế hoạch bàn giao: app "bu học" (3 chế độ)
+# Kế hoạch bàn giao: app "Bu chơi" (3 chế độ)
 
 Dành cho phiên Claude chạy trên máy Mac của người dùng (có Xcode, build được). Code dưới đây được viết trên cloud, **chưa từng được biên dịch hay chạy thử**. Việc chính: build, sửa lỗi biên dịch, chạy thử trên iPad, chỉnh cho mượt.
 
 ## Bối cảnh
-- App iPad native (Swift, SwiftUI + SpriteKit, iPadOS 17+, Xcode 16+). Tên hiển thị "bu học", target `MeoPhoDem`, project dùng synchronized folder nên file `.swift` mới trong `MeoPhoDem/` tự được thêm vào target.
+- App iPad native (Swift, SwiftUI + SpriteKit, iPadOS 17+, Xcode 16+). Tên hiển thị "Bu chơi" (chủ đã đặt: app học là "Bu học" – repo learnfirst, app này là "Bu chơi"; icon chữ bubu giống app học), target `MeoPhoDem`, project dùng synchronized folder nên file `.swift` mới trong `MeoPhoDem/` tự được thêm vào target.
 - Người chơi chính: **bé 5–6 tuổi**. Game chậm, dễ tha lỗi, không phạt nặng.
 - Điều khiển bằng camera trước + Vision body pose. **Không dùng micro** (bé la ồn, người dùng không muốn). Mọi xử lý trên máy, không cần mạng.
 - Quy trình git: commit thẳng vào `main`, không tạo nhánh hay PR.
@@ -30,6 +30,12 @@ Lồng đèn, bánh, onigiri… bị tung lên, vung tay thật nhanh để ché
 
 ### 3. Dance "Múa theo mẫu"
 Nhạc 100 BPM (tổng hợp bằng `AVAudioSourceNode`, không có file nhạc). Mỗi ván 10 tư thế tay đơn giản; người que mẫu bên trái, hình người que của bé bên phải (vẽ theo cổ tay thật). Giống trong ~0,5 giây là được ⭐, không phạt. Tư thế là vị trí hai cổ tay so với ngực trong `DanceScene.poses`: dễ thêm/bớt. Chạm màn hình = chơi thử không cần camera. Quy tắc: **không tư thế khó** (không hip hop, trồng cây chuối, không dùng chân).
+
+## Tiến độ trên máy Mac (05/11/2026)
+- [x] Bước 1 build: chỉ có 1 lỗi biên dịch (`private var speed` trùng `SKNode.speed` → đổi `runSpeed`). Đã cài lên iPad.
+- [x] Bước 2 dọn: xoá `VoiceMeter.swift`, bỏ `noiseDB`/`shoutDB`/`jumpThresholdDB`, `levelDB`/`micReady`/`micProblem`.
+- [x] Thêm icon bubu (`Assets.xcassets`), tên "Bu chơi".
+- [ ] Bước 3–5: cần chạy thử với bé trên iPad thật.
 
 ## Việc cần làm (theo thứ tự)
 1. **Build**: mở `MeoPhoDem.xcodeproj`, chọn Team, Run trên iPad thật. Sửa lỗi biên dịch (nhiều khả năng ở `DanceMusic.swift`, `DanceScene.swift`, `ActionScene.swift`; đây là code chưa từng chạy).

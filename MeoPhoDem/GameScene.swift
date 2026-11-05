@@ -84,7 +84,7 @@ final class GameScene: SKScene {
     private var jumpY: CGFloat = 0
     private var jumpV: CGFloat = 0
     private var airborne = false
-    private var speed: CGFloat = Tune.startSpeed
+    private var runSpeed: CGFloat = Tune.startSpeed
     private var distance: CGFloat = 0
     private var dodged = 0
     private var lives = Tune.lives
@@ -661,7 +661,7 @@ final class GameScene: SKScene {
     private func resetGame() {
         for obstacle in obstacles { obstacle.node.removeFromParent() }
         obstacles.removeAll()
-        speed = Tune.startSpeed
+        runSpeed = Tune.startSpeed
         distance = 0
         dodged = 0
         lives = Tune.lives
@@ -691,8 +691,8 @@ final class GameScene: SKScene {
 
         if jumpEvent { jumpCount += 1 }
 
-        speed = min(Tune.maxSpeed, speed + Tune.speedRamp * dt)
-        distance += speed * dt
+        runSpeed = min(Tune.maxSpeed, runSpeed + Tune.speedRamp * dt)
+        distance += runSpeed * dt
         updatePlayer(dt, now, allowJump: true)
         updateObstacles(dt, now)
         moveDecor(dt)
@@ -761,7 +761,7 @@ final class GameScene: SKScene {
         }
 
         for obstacle in obstacles {
-            obstacle.z -= speed * dt
+            obstacle.z -= runSpeed * dt
             let s = depthScale(obstacle.z)
             obstacle.node.position = CGPoint(x: cx + CGFloat(obstacle.lane - 1) * laneW0 * s, y: groundY(s))
             obstacle.node.setScale(s)
@@ -826,11 +826,11 @@ final class GameScene: SKScene {
     private func moveDecor(_ dt: CGFloat) {
         // Vạch và đèn chạy về phía người chơi, qua khỏi thì quay lại phía xa.
         for lantern in lanterns {
-            lantern.z -= speed * dt
+            lantern.z -= runSpeed * dt
             if lantern.z < -2 { lantern.z += 32 }
         }
         for dash in dashes {
-            dash.z -= speed * dt
+            dash.z -= runSpeed * dt
             if dash.z < -2 { dash.z += 32.5 }
         }
         layoutDecor()
