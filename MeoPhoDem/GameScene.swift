@@ -136,11 +136,14 @@ final class GameScene: SKScene {
     private let progressFill = SKSpriteNode(color: .systemYellow, size: CGSize(width: 500, height: 14))
     private let recalibButton = GameScene.makeLabel(size: 34)
     private let faceButton = GameScene.makeLabel(size: 34)
+    private let homeButton = GameScene.makeLabel(size: 34)
 
     /// Màn chọn nhân vật gọi khi xong; game chỉ bắt đầu hiệu chỉnh sau đó.
     private var avatarChosen = false
     /// Gọi khi người chơi bấm "Đổi nhân vật" ở màn hết ván.
     var onChangeFace: (() -> Void)?
+    /// Gọi khi người chơi bấm "Về màn chọn chế độ" ở màn hết ván.
+    var onExit: (() -> Void)?
 
     func setFace(_ image: UIImage?) {
         if let image {
@@ -512,6 +515,13 @@ final class GameScene: SKScene {
         faceButton.isHidden = true
         addChild(faceButton)
 
+        homeButton.text = "🏠 Chọn chế độ khác"
+        homeButton.fontColor = .systemYellow
+        homeButton.position = CGPoint(x: cx, y: 220)
+        homeButton.zPosition = 601
+        homeButton.isHidden = true
+        addChild(homeButton)
+
         flash.size = size
         flash.position = CGPoint(x: cx, y: size.height / 2)
         flash.alpha = 0
@@ -529,6 +539,7 @@ final class GameScene: SKScene {
         calibPeak = -80
         recalibButton.isHidden = next != .gameOver
         faceButton.isHidden = next != .gameOver
+        homeButton.isHidden = next != .gameOver
     }
 
     override func update(_ currentTime: TimeInterval) {
@@ -935,7 +946,12 @@ final class GameScene: SKScene {
             if !airborne { startJump(0.5, now) }
         case .gameOver:
             guard now - gameOverTime > 1 else { return }
-            if faceButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
+            if homeButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
+                avatarChosen = false
+                show(nil)
+                enter(.waiting)
+                onExit?()
+            } else if faceButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
                 avatarChosen = false
                 show(nil)
                 enter(.waiting)

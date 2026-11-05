@@ -1,6 +1,16 @@
-# Mèo Phố Đêm 🐱🏮
+# bu học 🐱🏮
 
-Game chạy vô tận cho iPad, **không dùng tay**: một chú mèo chạy trên phố Nhật về đêm, 3 làn, né thùng gỗ.
+App trò chơi vận động cho iPad, điều khiển bằng cả cơ thể qua camera trước. Mở app sẽ thấy màn **chọn chế độ**:
+
+| Chế độ | Trò chơi |
+|---|---|
+| 🏃 **Running** | *Mèo Phố Đêm*: chạy vô tận 3 làn, bước ngang để đổi làn, hét để nhảy (chi tiết bên dưới). |
+| ⚔️ **Action** | *Chém Lồng Đèn*: lồng đèn, bánh dango, onigiri… bị tung lên từ dưới, **vung tay thật nhanh** để chém. Đừng chém pháo 🧨 (trừ 5 điểm). Ván 60 giây, chém liền 3 vật trở lên trong một nhát được thưởng combo. Giơ hai tay lên cao để bắt đầu / chơi lại. |
+| 💃 **Dance** | Sắp ra mắt. |
+
+## Running: Mèo Phố Đêm
+
+Game chạy vô tận, **không dùng tay**: một chú mèo chạy trên phố Nhật về đêm, 3 làn, né thùng gỗ.
 
 - **Bước sang trái/phải** → mèo đổi làn (đứng chỗ nào, mèo chạy làn đó). Dùng camera trước + Apple Vision.
 - **Hét to** → mèo nhảy. Hét càng to / càng dài thì nhảy càng cao. Dùng micro (chỉ đo âm lượng, không ghi âm).
@@ -39,19 +49,29 @@ Game chạy vô tận cho iPad, **không dùng tay**: một chú mèo chạy tr�
 
 **Thử nhanh không cần đứng xa:** chạm màn hình trong lúc hiệu chỉnh để chuyển sang chế độ cảm ứng (chạm 1/3 trái/phải để đổi làn, chạm giữa để nhảy). Chế độ này cũng chạy được trên Simulator.
 
+### Cách chơi Action
+
+1. Ở màn chọn chế độ, chạm **Action**.
+2. Đứng cách iPad khoảng **1,5–2 mét**, camera thấy từ đầu tới hông và cả hai tay.
+3. Giơ hai tay lên cao khoảng 1 giây để bắt đầu. Hai vòng tròn trên màn hình là vị trí hai tay bạn.
+4. Vung tay thật nhanh qua vật đang bay để chém. Tay đi chậm thì không chém (để không chém nhầm khi chỉ đưa tay).
+5. Thử nhanh không cần đứng xa: chạm màn hình ở màn chờ để chơi bằng cách vuốt ngón tay (chạy được trên Simulator).
+
 ## Chỉnh độ khó
 
 Các con số nằm ở `Tune` đầu file `MeoPhoDem/GameScene.swift`: tốc độ (`startSpeed`, `maxSpeed`), khoảng cách giữa các thùng (`firstGap`, `minGap`), độ cao nhảy (`jumpMin`, `jumpMax`), số mạng (`lives`).
+Action: `Tune` đầu file `MeoPhoDem/ActionScene.swift`: thời gian ván (`roundTime`), trọng lực (`gravity`, nhỏ thì vật bay chậm hơn), tốc độ vung tay tối thiểu để chém (`sliceSpeed`, giảm xuống thì vung nhẹ cũng chém), độ rộng vùng trúng (`itemRadius`), tỉ lệ pháo (`bombChance`).
 Ngưỡng hét nằm ở `jumpThresholdDB` trong `Calibration.swift` (hệ số `0.45`: giảm xuống thì hét nhỏ hơn cũng nhảy).
 
 ## Cấu trúc code
 
 | File | Việc |
 |---|---|
-| `MeoPhoDemApp.swift`, `ContentView.swift` | Khởi động app, hiện game + khung camera nhỏ |
-| `BodyTracker.swift` | Camera trước + Vision body pose → vị trí hông, ~20 lần/giây |
+| `MeoPhoDemApp.swift`, `ContentView.swift` | Khởi động app, màn chọn chế độ, hiện từng game + khung camera nhỏ, màn Dance "sắp ra mắt" |
+| `BodyTracker.swift` | Camera trước + Vision body pose → vị trí hông, vai, hai cổ tay, ~30 lần/giây |
+| `ActionScene.swift` | SpriteKit: chế độ Action (chém lồng đèn bằng vung tay) |
 | `VoiceMeter.swift` | AVAudioEngine → âm lượng (dB) liên tục |
 | `Calibration.swift` | Ngưỡng hét, hướng trái/phải, chia làn |
-| `GameScene.swift` | SpriteKit: cảnh phố đêm giả 3D, mèo, thùng gỗ, điểm, mạng, màn hiệu chỉnh |
+| `GameScene.swift` | SpriteKit: chế độ Running, cảnh phố đêm giả 3D, mèo, thùng gỗ, điểm, mạng, màn hiệu chỉnh |
 | `CameraPreview.swift` | Khung xem camera ở góc |
 | `FacePicker.swift`, `FaceCapture.swift` | Màn chọn nhân vật: chụp, cắt khuôn mặt tròn, lưu ảnh |

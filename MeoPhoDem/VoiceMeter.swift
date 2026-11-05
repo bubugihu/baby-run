@@ -14,7 +14,7 @@ final class VoiceMeter {
         started = true
         AVAudioApplication.requestRecordPermission { granted in
             DispatchQueue.main.async {
-                if granted { self.configureAndRun() } else { self.fail("Chưa cho phép micro. Vào Cài đặt → Mèo Phố Đêm → bật Micro.") }
+                if granted { self.configureAndRun() } else { self.fail("Chưa cho phép micro. Vào Cài đặt → bu học → bật Micro.") }
             }
         }
     }

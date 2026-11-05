@@ -27,11 +27,11 @@ final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
-                    if granted { self.configureAndRun() } else { self.fail("Chưa cho phép camera. Vào Cài đặt → Mèo Phố Đêm → bật Camera.") }
+                    if granted { self.configureAndRun() } else { self.fail("Chưa cho phép camera. Vào Cài đặt → bu học → bật Camera.") }
                 }
             }
         default:
-            fail("Chưa cho phép camera. Vào Cài đặt → Mèo Phố Đêm → bật Camera.")
+            fail("Chưa cho phép camera. Vào Cài đặt → bu học → bật Camera.")
         }
     }
 
@@ -107,9 +107,22 @@ final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
 
         let handler = VNImageRequestHandler(cmSampleBuffer: sampleBuffer, orientation: .up, options: [:])
         guard (try? handler.perform([request])) != nil else { return }
-        let body = Self.bodyCenter(of: Self.mainPerson(request.results ?? []))
+        let person = Self.mainPerson(request.results ?? [])
+        let body = Self.bodyCenter(of: person)
+        var aspect: CGFloat = 4.0 / 3.0
+        if let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) {
+            let w = CGFloat(CVPixelBufferGetWidth(buffer)), h = CGFloat(CVPixelBufferGetHeight(buffer))
+            // Ảnh đã được xoay theo videoRotationAngle nên bộ đệm có thể là dọc hoặc ngang.
+            if h > 0 { aspect = w / h }
+        }
+        let hands = Self.handPose(of: person, aspect: aspect)
 
         DispatchQueue.main.async {
+            if let hands {
+                InputHub.shared.hands = hands
+                InputHub.shared.handsTime = now
+                InputHub.shared.handsFrame &+= 1
+            }
             guard let body else { return }
             InputHub.shared.bodyPoint = body.point
             InputHub.shared.fullBodyVisible = body.fullBody
@@ -128,6 +141,30 @@ final class BodyTracker: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         guard let minY = good.map(\.y).min(), let maxY = good.map(\.y).max(),
               let minX = good.map(\.x).min(), let maxX = good.map(\.x).max() else { return 0 }
         return max(maxY - minY, maxX - minX)
+    }
+
+    /// Vị trí hai cổ tay so với ngực. Cổ tay hay bị mờ khi vung nhanh nên ngưỡng tin cậy thấp hơn.
+    private static func handPose(of person: VNHumanBodyPoseObservation?, aspect: CGFloat) -> HandPose? {
+        guard let person, let points = try? person.recognizedPoints(.all) else { return nil }
+        func joint(_ name: VNHumanBodyPoseObservation.JointName, _ minConfidence: Float = 0.3) -> CGPoint? {
+            guard let p = points[name], p.confidence > minConfidence else { return nil }
+            return CGPoint(x: p.location.x * aspect, y: p.location.y)
+        }
+        guard let ls = joint(.leftShoulder), let rs = joint(.rightShoulder) else { return nil }
+        let width = hypot(rs.x - ls.x, rs.y - ls.y)
+        guard width > 0.02 else { return nil }
+        let chest = CGPoint(x: (ls.x + rs.x) / 2, y: (ls.y + rs.y) / 2)
+        // Hướng lên: từ hông tới ngực, không thấy hông thì từ ngực tới mũi.
+        var up = CGVector(dx: 0, dy: 1)
+        if let lh = joint(.leftHip), let rh = joint(.rightHip) {
+            up = CGVector(dx: chest.x - (lh.x + rh.x) / 2, dy: chest.y - (lh.y + rh.y) / 2)
+        } else if let nose = joint(.nose) {
+            up = CGVector(dx: nose.x - chest.x, dy: nose.y - chest.y)
+        }
+        let length = hypot(up.dx, up.dy)
+        up = length > 0.01 ? CGVector(dx: up.dx / length, dy: up.dy / length) : CGVector(dx: 0, dy: 1)
+        return HandPose(chest: chest, shoulderWidth: width, up: up,
+                        left: joint(.leftWrist, 0.15), right: joint(.rightWrist, 0.15))
     }
 
     /// Ưu tiên hông (ổn định nhất khi bước ngang), không có thì dùng vai/cổ.

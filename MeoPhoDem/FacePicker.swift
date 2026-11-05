@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Màn chọn nhân vật trước khi vào game: chụp ảnh khuôn mặt hoặc dùng con mèo.
 struct FacePicker: View {
+    var onBack: (() -> Void)? = nil
     var onDone: (UIImage?) -> Void
 
     @State private var captured: UIImage?
@@ -57,6 +58,25 @@ struct FacePicker: View {
                 }
             }
             .foregroundStyle(.white)
+
+            if let onBack {
+                VStack {
+                    HStack {
+                        Button(action: onBack) {
+                            Text("← Chọn chế độ")
+                                .font(.system(size: 24, weight: .bold))
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 14)
+                                .background(Color.white.opacity(0.15), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.white)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .padding(30)
+            }
         }
     }
 
