@@ -137,6 +137,16 @@ final class GameScene: SKScene {
     /// Gọi khi người chơi bấm "Về màn chọn chế độ" ở màn hết ván.
     var onExit: (() -> Void)?
 
+    /// Về màn chọn chế độ (nút 🏠 ở màn hết ván hoặc nút ✕ ở góc lúc đang chơi).
+    func exitToMenu() {
+        touchMode = false
+        avatarChosen = false
+        resetGame()
+        show(nil)
+        enter(.waiting)
+        onExit?()
+    }
+
     func setFace(_ image: UIImage?) {
         if let image {
             face.texture = SKTexture(image: image)
@@ -873,10 +883,7 @@ final class GameScene: SKScene {
         case .gameOver:
             guard now - gameOverTime > 1 else { return }
             if homeButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
-                avatarChosen = false
-                show(nil)
-                enter(.waiting)
-                onExit?()
+                exitToMenu()
             } else if faceButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
                 avatarChosen = false
                 show(nil)

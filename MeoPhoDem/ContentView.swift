@@ -31,6 +31,23 @@ struct ContentView: View {
     }
 }
 
+/// Nút thoát nhỏ ở góc trên bên trái, lúc nào cũng có trong game: về màn chọn chế độ.
+private struct ExitButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: 40, height: 40)
+                .background(.black.opacity(0.4), in: Circle())
+        }
+        .padding(16)
+        .accessibilityLabel("Thoát")
+    }
+}
+
 /// Khung camera nhỏ ở góc để người chơi biết mình còn trong hình.
 private struct CornerCamera: View {
     var body: some View {
@@ -72,6 +89,9 @@ struct RunningView: View {
                 CornerCamera()
             }
         }
+        .overlay(alignment: .topLeading) {
+            if !choosingFace { ExitButton { scene.exitToMenu() } }
+        }
         .onAppear {
             scene.onChangeFace = { choosingFace = true }
             scene.onExit = onExit
@@ -96,6 +116,7 @@ struct ActionView: View {
                 .ignoresSafeArea()
             CornerCamera()
         }
+        .overlay(alignment: .topLeading) { ExitButton { scene.exitToMenu() } }
         .onAppear { scene.onExit = onExit }
     }
 }
@@ -178,6 +199,7 @@ struct DanceView: View {
                 .ignoresSafeArea()
             CornerCamera()
         }
+        .overlay(alignment: .topLeading) { ExitButton { scene.exitToMenu() } }
         .onAppear { scene.onExit = onExit }
         .onDisappear { DanceMusic.shared.stop() }
     }

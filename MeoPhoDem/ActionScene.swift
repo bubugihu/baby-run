@@ -816,7 +816,7 @@ final class ActionScene: SKScene {
         blades[2].last = nil
     }
 
-    private func exitToMenu() {
+    func exitToMenu() {
         touchMode = false
         resetGame()
         show(nil)

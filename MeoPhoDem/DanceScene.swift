@@ -610,7 +610,7 @@ final class DanceScene: SKScene {
         }
     }
 
-    private func exitToMenu() {
+    func exitToMenu() {
         touchMode = false
         DanceMusic.shared.stop()
         show(nil)
