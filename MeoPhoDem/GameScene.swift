@@ -107,6 +107,7 @@ final class GameScene: SKScene {
     private let player = SKNode()
     private let avatar = SKNode()               // phần lắc lư của nhân vật
     private let cat = SKLabelNode(text: "🐱")
+    private let playerShadow = SKShapeNode(ellipseOf: CGSize(width: 180, height: 40))
     private let face = SKSpriteNode()            // ảnh khuôn mặt người chơi (nếu có)
     private var wobble: CGFloat = 0
     private var wobbleVel: CGFloat = 0
@@ -408,6 +409,11 @@ final class GameScene: SKScene {
     }
 
     private func buildPlayer() {
+        playerShadow.fillColor = UIColor(white: 0, alpha: 0.4)
+        playerShadow.strokeColor = .clear
+        playerShadow.zPosition = 99
+        world.addChild(playerShadow)
+
         cat.fontSize = 170
         cat.verticalAlignmentMode = .bottom
         cat.position = CGPoint(x: 0, y: -18)
@@ -735,6 +741,9 @@ final class GameScene: SKScene {
         if !avatar.hasActions() {
             avatar.yScale = running ? 1 + sin(CGFloat(now) * 22) * 0.035 : 1
         }
+
+        playerShadow.position = CGPoint(x: x, y: groundY0)
+        playerShadow.setScale(1 / (1 + jumpY * 0.6))
 
         if now < invincibleUntil {
             player.alpha = Int(now * 10) % 2 == 0 ? 0.35 : 1
