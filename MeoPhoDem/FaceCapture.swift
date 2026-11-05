@@ -54,6 +54,9 @@ enum FaceCropper {
 
 /// Lưu ảnh khuôn mặt lần trước để lần sau khỏi chụp lại.
 enum FaceStore {
+    /// Nhân vật chọn lúc mở app, mọi game dùng chung. nil = dùng con mèo.
+    static var current: UIImage?
+
     private static var url: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("face.png")
     }

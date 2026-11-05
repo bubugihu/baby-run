@@ -8,18 +8,27 @@ enum GameMode {
 
 struct ContentView: View {
     @State private var mode: GameMode?
+    /// Chụp ảnh (hoặc chọn mèo) một lần lúc mở app, rồi game nào cũng dùng ảnh đó.
+    @State private var avatarChosen = false
 
     var body: some View {
         Group {
-            switch mode {
-            case nil:
-                ModeMenu { mode = $0 }
-            case .running?:
-                RunningView { mode = nil }
-            case .action?:
-                ActionView { mode = nil }
-            case .dance?:
-                DanceView { mode = nil }
+            if !avatarChosen {
+                FacePicker { face in
+                    FaceStore.current = face
+                    avatarChosen = true
+                }
+            } else {
+                switch mode {
+                case nil:
+                    ModeMenu(onChangeFace: changeFace) { mode = $0 }
+                case .running?:
+                    RunningView(onChangeFace: changeFace) { mode = nil }
+                case .action?:
+                    ActionView { mode = nil }
+                case .dance?:
+                    DanceView { mode = nil }
+                }
             }
         }
         .statusBarHidden(true)
@@ -28,6 +37,11 @@ struct ContentView: View {
             UIApplication.shared.isIdleTimerDisabled = true
             BodyTracker.shared.start()
         }
+    }
+
+    private func changeFace() {
+        mode = nil
+        avatarChosen = false
     }
 }
 
@@ -63,6 +77,7 @@ private struct CornerCamera: View {
 // MARK: - Running: game chạy 3 làn (Mèo Phố Đêm)
 
 struct RunningView: View {
+    var onChangeFace: () -> Void
     var onExit: () -> Void
 
     // Scene cố định 1400x1000, phóng cho vừa màn hình iPad (cắt nhẹ hai mép nếu màn 4:3).
@@ -71,30 +86,18 @@ struct RunningView: View {
         scene.scaleMode = .aspectFill
         return scene
     }()
-    @State private var choosingFace = true
-
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             // ignoresSiblingOrder: thứ tự vẽ chỉ theo zPosition, SpriteKit gom lệnh vẽ được nhiều hơn.
             SpriteView(scene: scene, preferredFramesPerSecond: 60, options: [.ignoresSiblingOrder])
                 .ignoresSafeArea()
-
-            if choosingFace {
-                FacePicker(onBack: onExit) { face in
-                    scene.setFace(face)
-                    choosingFace = false
-                }
-            } else {
-                // Chỉ một khung camera hiện ra mỗi lúc (màn chọn nhân vật có khung riêng).
-                CornerCamera()
-            }
+            CornerCamera()
         }
-        .overlay(alignment: .topLeading) {
-            if !choosingFace { ExitButton { scene.exitToMenu() } }
-        }
+        .overlay(alignment: .topLeading) { ExitButton { scene.exitToMenu() } }
         .onAppear {
-            scene.onChangeFace = { choosingFace = true }
+            scene.onChangeFace = onChangeFace
             scene.onExit = onExit
+            scene.setFace(FaceStore.current)
         }
     }
 }
@@ -124,6 +127,7 @@ struct ActionView: View {
 // MARK: - Màn chọn chế độ
 
 struct ModeMenu: View {
+    var onChangeFace: () -> Void
     var onPick: (GameMode) -> Void
 
     var body: some View {
@@ -149,6 +153,26 @@ struct ModeMenu: View {
             }
             .foregroundStyle(.white)
             .padding(40)
+        }
+        .overlay(alignment: .topTrailing) {
+            // Nhân vật đang dùng; bấm để chụp lại.
+            Button(action: onChangeFace) {
+                HStack(spacing: 12) {
+                    if let face = FaceStore.current {
+                        Image(uiImage: face).resizable().scaledToFill()
+                            .frame(width: 56, height: 56).clipShape(Circle())
+                    } else {
+                        Text("🐱").font(.system(size: 44))
+                    }
+                    Text("Đổi ảnh").font(.system(size: 22, weight: .bold))
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(Color.white.opacity(0.15), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .padding(30)
         }
     }
 }

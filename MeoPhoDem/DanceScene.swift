@@ -234,7 +234,7 @@ final class DanceScene: SKScene {
             figure.node.zPosition = 20
             addChild(figure.node)
         }
-        playerFigure.setFace(FaceStore.load())
+        playerFigure.setFace(FaceStore.current)
         for (title, center) in [("Tư thế mẫu", targetCenter), ("Bé làm đi nào!", playerCenter)] {
             let label = Self.makeLabel(size: 30)
             label.text = title
