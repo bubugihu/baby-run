@@ -19,7 +19,7 @@ struct ContentView: View {
             case .action?:
                 ActionView { mode = nil }
             case .dance?:
-                DanceComingSoon { mode = nil }
+                DanceView { mode = nil }
             }
         }
         .statusBarHidden(true)
@@ -75,8 +75,6 @@ struct RunningView: View {
         .onAppear {
             scene.onChangeFace = { choosingFace = true }
             scene.onExit = onExit
-            // Chỉ chế độ Running cần micro (hét để nhảy).
-            VoiceMeter.shared.start()
         }
     }
 }
@@ -121,12 +119,11 @@ struct ModeMenu: View {
                         .opacity(0.8)
                 }
                 HStack(spacing: 28) {
-                    ModeCard(icon: "🏃", title: "Running", subtitle: "Bước ngang để đổi làn\nHét để nhảy",
+                    ModeCard(icon: "🏃", title: "Running", subtitle: "Bước ngang để đổi làn\nNhảy lên để nhảy",
                              color: .orange) { onPick(.running) }
                     ModeCard(icon: "⚔️", title: "Action", subtitle: "Vung tay thật nhanh\nchém lồng đèn bay lên",
                              color: .pink) { onPick(.action) }
-                    ModeCard(icon: "💃", title: "Dance", subtitle: "Sắp ra mắt", color: .purple,
-                             comingSoon: true) { onPick(.dance) }
+                    ModeCard(icon: "💃", title: "Dance", subtitle: "Làm theo tư thế\nmúa theo nhạc", color: .purple) { onPick(.dance) }
                 }
             }
             .foregroundStyle(.white)
@@ -164,34 +161,24 @@ private struct ModeCard: View {
     }
 }
 
-// MARK: - Dance: chỗ để sẵn
+// MARK: - Dance: múa theo tư thế mẫu
 
-struct DanceComingSoon: View {
-    var onBack: () -> Void
+struct DanceView: View {
+    var onExit: () -> Void
+
+    @State private var scene: DanceScene = {
+        let scene = DanceScene(size: CGSize(width: 1400, height: 1000))
+        scene.scaleMode = .aspectFill
+        return scene
+    }()
 
     var body: some View {
-        ZStack {
-            LinearGradient(colors: [Color(red: 0.18, green: 0.06, blue: 0.30), Color(red: 0.05, green: 0.05, blue: 0.16)],
-                           startPoint: .top, endPoint: .bottom)
+        ZStack(alignment: .bottomTrailing) {
+            SpriteView(scene: scene, preferredFramesPerSecond: 60, options: [.ignoresSiblingOrder])
                 .ignoresSafeArea()
-            VStack(spacing: 28) {
-                Text("💃🕺").font(.system(size: 110))
-                Text("Dance").font(.system(size: 60, weight: .heavy, design: .rounded))
-                Text("Sắp ra mắt! Trò chơi nhảy theo nhạc đang được lên ý tưởng.")
-                    .font(.system(size: 26, weight: .semibold))
-                    .multilineTextAlignment(.center)
-                    .opacity(0.85)
-                Button(action: onBack) {
-                    Text("← Quay lại")
-                        .font(.system(size: 28, weight: .bold))
-                        .padding(.horizontal, 36)
-                        .padding(.vertical, 18)
-                        .background(Color.white.opacity(0.18), in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-            .foregroundStyle(.white)
-            .padding(40)
+            CornerCamera()
         }
+        .onAppear { scene.onExit = onExit }
+        .onDisappear { DanceMusic.shared.stop() }
     }
 }

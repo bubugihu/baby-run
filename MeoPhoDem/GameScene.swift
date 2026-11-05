@@ -3,7 +3,7 @@ import UIKit
 import QuartzCore
 
 /// Mèo chạy phố Nhật về đêm: 3 làn, né thùng gỗ.
-/// Bước ngang = đổi làn, hét = nhảy (to/dài = cao hơn).
+/// Bước ngang = đổi làn, nhảy thật (hoặc chạm màn hình) = nhảy.
 final class GameScene: SKScene {
 
     // MARK: - Tinh chỉnh (game chậm, dễ tha lỗi)
@@ -18,16 +18,16 @@ final class GameScene: SKScene {
         static let crateHeight: CGFloat = 0.6
         static let hitDepth: CGFloat = 0.4
         static let gravity: CGFloat = 12
-        static let heldGravity: CGFloat = 6       // còn hét khi đang bay lên → bay cao hơn
-        static let jumpMin: CGFloat = 6
-        static let jumpMax: CGFloat = 8.5
+        static let jumpSpeed: CGFloat = 7
+        static let jumpRise: CGFloat = 0.05       // thân người nhích lên chừng này (so với chiều cao ảnh) = nhảy thật
+        static let jumpCooldown: TimeInterval = 0.6
         static let invincible: TimeInterval = 2
         static let bodyLostPause: TimeInterval = 1.2
         static let lives = 3
     }
 
     private enum Phase {
-        case waiting, calibStill, calibLeft, calibRight, calibShout, countdown, playing, paused, gameOver
+        case waiting, calibStill, calibLeft, calibRight, countdown, playing, paused, gameOver
     }
 
     private final class Obstacle {
@@ -68,15 +68,11 @@ final class GameScene: SKScene {
     private var touchMode = false
     private var built = false
 
-    private var level: Float = -80
-    private var wasLoud = false
-    private var lastShoutTime: TimeInterval = 0
-    private var shoutEvent = false
+    private var baseY: CGFloat?
+    private var lastJumpTime: TimeInterval = 0
+    private var jumpEvent = false
 
     private var pointSamples: [CGPoint] = []
-    private var levelSamples: [Float] = []
-    private var calibPeak: Float = -80
-    private var calibPeakTime: TimeInterval = 0
     private var calibCenter = CGPoint(x: 0.5, y: 0.5)
     private var calibLeftPoint = CGPoint.zero
     private var calibNote: String?
@@ -88,7 +84,6 @@ final class GameScene: SKScene {
     private var jumpY: CGFloat = 0
     private var jumpV: CGFloat = 0
     private var airborne = false
-    private var jumpStart: TimeInterval = 0
     private var speed: CGFloat = Tune.startSpeed
     private var distance: CGFloat = 0
     private var dodged = 0
@@ -96,8 +91,7 @@ final class GameScene: SKScene {
     private var invincibleUntil: TimeInterval = 0
     private var nextSpawn: TimeInterval = 0
     private var obstacles: [Obstacle] = []
-    private var shoutCount = 0
-    private var loudestDB: Float = -80
+    private var jumpCount = 0
     private var bodyLostSince: TimeInterval?
     private var resuming = false
     private var gameOverTime: TimeInterval = 0
@@ -116,7 +110,6 @@ final class GameScene: SKScene {
     private let face = SKSpriteNode()            // ảnh khuôn mặt người chơi (nếu có)
     private var wobble: CGFloat = 0
     private var wobbleVel: CGFloat = 0
-    private let playerShadow = SKShapeNode(ellipseOf: CGSize(width: 180, height: 40))
     private var lanterns: [Decor] = []
     private var lanternTemplate = SKNode()
     private var crateTemplate = SKNode()
@@ -127,8 +120,6 @@ final class GameScene: SKScene {
     private var laneSlots: [SKShapeNode] = []
     private var shownSlotLane = -1
     private let laneDot = SKShapeNode(circleOfRadius: 9)
-    private let volumeFill = SKSpriteNode(color: .systemGreen, size: CGSize(width: 40, height: 300))
-    private let volumeThreshold = SKSpriteNode(color: .systemOrange, size: CGSize(width: 60, height: 5))
     private let messagePanel = SKShapeNode()
     private let titleLabel = GameScene.makeLabel(size: 62)
     private let subLabel = GameScene.makeLabel(size: 32)
@@ -417,11 +408,6 @@ final class GameScene: SKScene {
     }
 
     private func buildPlayer() {
-        playerShadow.fillColor = UIColor(white: 0, alpha: 0.4)
-        playerShadow.strokeColor = .clear
-        playerShadow.zPosition = 99
-        world.addChild(playerShadow)
-
         cat.fontSize = 170
         cat.verticalAlignmentMode = .bottom
         cat.position = CGPoint(x: 0, y: -18)
@@ -459,24 +445,6 @@ final class GameScene: SKScene {
         laneDot.strokeColor = .clear
         laneDot.zPosition = 501
         addChild(laneDot)
-
-        // Cột âm lượng + vạch ngưỡng hét.
-        let volumeBack = SKSpriteNode(color: UIColor(white: 1, alpha: 0.18), size: CGSize(width: 40, height: 300))
-        volumeBack.anchorPoint = CGPoint(x: 0.5, y: 0)
-        volumeBack.position = CGPoint(x: 100, y: 120)
-        volumeBack.zPosition = 500
-        addChild(volumeBack)
-        volumeFill.anchorPoint = CGPoint(x: 0.5, y: 0)
-        volumeFill.position = volumeBack.position
-        volumeFill.zPosition = 501
-        addChild(volumeFill)
-        volumeThreshold.zPosition = 502
-        addChild(volumeThreshold)
-        let mic = SKLabelNode(text: "🎤")
-        mic.fontSize = 36
-        mic.position = CGPoint(x: 100, y: 70)
-        mic.zPosition = 500
-        addChild(mic)
 
         // Bảng thông báo giữa màn hình.
         messagePanel.fillColor = UIColor(white: 0, alpha: 0.55)
@@ -535,8 +503,6 @@ final class GameScene: SKScene {
         phase = next
         phaseStart = CACurrentMediaTime()
         pointSamples.removeAll()
-        levelSamples.removeAll()
-        calibPeak = -80
         recalibButton.isHidden = next != .gameOver
         faceButton.isHidden = next != .gameOver
         homeButton.isHidden = next != .gameOver
@@ -546,7 +512,7 @@ final class GameScene: SKScene {
         let now = CACurrentMediaTime()
         let dt = CGFloat(min(max(now - lastTime, 0), 1.0 / 20))
         lastTime = now
-        readVoice(now)
+        readJump(now)
         let elapsed = now - phaseStart
         var progress: Double?
 
@@ -556,7 +522,7 @@ final class GameScene: SKScene {
             // Thiếu micro vẫn chơi được bằng camera (chạm giữa màn hình để nhảy).
             if let problem = hub.cameraProblem {
                 show("Cần quyền camera", problem + "\nChạm màn hình để chơi thử bằng cảm ứng.")
-            } else if hub.cameraReady && (hub.micReady || hub.micProblem != nil) {
+            } else if hub.cameraReady {
                 enter(.calibStill)
             } else {
                 show("Đang mở camera và micro…")
@@ -566,29 +532,27 @@ final class GameScene: SKScene {
             progress = runCalibStill(now, elapsed)
 
         case .calibLeft:
-            progress = runSideStep(now, elapsed, title: "Bước 2/4 · Bước sang TRÁI một bước dài") { point in
+            progress = runSideStep(now, elapsed, title: "Bước 2/3 · Bước sang TRÁI một bước dài") { point in
                 calibLeftPoint = point
                 enter(.calibRight)
             }
 
         case .calibRight:
-            progress = runSideStep(now, elapsed, title: "Bước 3/4 · Bước sang PHẢI một bước dài") { point in
+            progress = runSideStep(now, elapsed, title: "Bước 3/3 · Bước sang PHẢI một bước dài") { point in
                 if calib.setPositions(center: calibCenter, left: calibLeftPoint, right: point) {
-                    enter(.calibShout)
+                    calibNote = nil
+                    startCountdown(resume: false)
                 } else {
                     calibNote = "Chưa rõ trái/phải, mình làm lại nhé: bước sang TRÁI."
                     enter(.calibLeft)
                 }
             }
 
-        case .calibShout:
-            progress = runCalibShout(now, elapsed)
-
         case .countdown:
             let total = resuming ? 2.0 : 3.0
             let left = total - elapsed
             show("\(Int(ceil(max(left, 0.01))))",
-                 resuming ? "Chơi tiếp!" : "Bước ngang để đổi làn · Hét để nhảy")
+                 resuming ? "Chơi tiếp!" : "Bước ngang để đổi làn · Nhảy lên để nhảy")
             updatePlayer(dt, now, allowJump: false)
             if left <= 0 {
                 show(nil)
@@ -603,23 +567,24 @@ final class GameScene: SKScene {
             if hub.bodyVisible(at: now) { startCountdown(resume: true) }
 
         case .gameOver:
-            if shoutEvent && elapsed > 2 { startCountdown(resume: false) }
+            if jumpEvent && elapsed > 2 { startCountdown(resume: false) }
         }
 
         updateHUD(now, progress: progress)
     }
 
-    private func readVoice(_ now: TimeInterval) {
-        level = hub.levelDB
-        let threshold = calib.jumpThresholdDB
-        let loud = level > threshold
-        shoutEvent = false
-        if loud && !wasLoud && now - lastShoutTime > 0.35 {
-            shoutEvent = true
-            lastShoutTime = now
+    /// Nhận ra bé nhảy thật: hông nhích lên nhanh so với mức đứng bình thường.
+    private func readJump(_ now: TimeInterval) {
+        jumpEvent = false
+        guard hub.bodyVisible(at: now), let point = hub.bodyPoint else { return }
+        guard let base = baseY else { baseY = point.y; return }
+        let rise = point.y - base
+        if rise > Tune.jumpRise && now - lastJumpTime > Tune.jumpCooldown {
+            jumpEvent = true
+            lastJumpTime = now
         }
-        // Trễ 4 dB để một tiếng hét không bị đếm thành nhiều lần.
-        if loud { wasLoud = true } else if level < threshold - 4 { wasLoud = false }
+        // Mức đứng bình thường bám theo chậm khi đang lên (để cú nhảy không bị coi là mức mới), nhanh khi xuống.
+        baseY = base + rise * (rise > 0 ? 0.02 : 0.15)
     }
 
     // MARK: - Hiệu chỉnh
@@ -630,7 +595,6 @@ final class GameScene: SKScene {
         show("Lùi ra xa khoảng 2 mét", "Đứng sao cho camera thấy cả người, từ đầu tới đầu gối." + skipHint)
         phaseStart = CACurrentMediaTime()
         pointSamples.removeAll()
-        levelSamples.removeAll()
         return 0
     }
 
@@ -648,16 +612,14 @@ final class GameScene: SKScene {
             stillAnchor = point
             phaseStart = now
             pointSamples.removeAll()
-            levelSamples.removeAll()
-            show("Bước 1/4 · Đứng yên ở GIỮA", "Giữ im lặng 3 giây để đo tiếng ồn trong phòng." + skipHint)
+            show("Bước 1/3 · Đứng yên ở GIỮA", "Đứng yên 3 giây nhé." + skipHint)
             return 0
         }
         pointSamples.append(point)
-        levelSamples.append(level)
-        show("Bước 1/4 · Đứng yên ở GIỮA", "Giữ im lặng 3 giây để đo tiếng ồn trong phòng." + skipHint)
+        show("Bước 1/3 · Đứng yên ở GIỮA", "Đứng yên 3 giây nhé." + skipHint)
         if elapsed >= 3 {
             calibCenter = mean(pointSamples)
-            calib.noiseDB = percentile(levelSamples, 0.9)
+            baseY = nil
             calibNote = nil
             stillAnchor = nil
             enter(.calibLeft)
@@ -682,28 +644,6 @@ final class GameScene: SKScene {
         return elapsed / 3
     }
 
-    private func runCalibShout(_ now: TimeInterval, _ elapsed: TimeInterval) -> Double {
-        if !hub.micReady {
-            startCountdown(resume: false)
-            return 1
-        }
-        if level > calibPeak {
-            calibPeak = level
-            calibPeakTime = now
-        }
-        let needed = calib.noiseDB + 12
-        show("Bước 4/4 · Về GIỮA rồi HÉT thật to!", calibNote ?? "Ví dụ: \"NHẢY!\"")
-        if calibPeak >= needed && now - calibPeakTime > 0.4 {
-            calib.shoutDB = calibPeak
-            calibNote = nil
-            startCountdown(resume: false)
-        } else if elapsed > 6 {
-            calibNote = "Chưa nghe rõ, hét to hơn nữa nào!"
-            enter(.calibShout)
-        }
-        return Double(min(1, max(0, (calibPeak - calib.noiseDB) / 12)))
-    }
-
     // MARK: - Chơi
 
     private func startCountdown(resume: Bool) {
@@ -720,8 +660,7 @@ final class GameScene: SKScene {
         dodged = 0
         lives = Tune.lives
         invincibleUntil = 0
-        shoutCount = 0
-        loudestDB = -80
+        jumpCount = 0
         jumpY = 0
         jumpV = 0
         airborne = false
@@ -744,8 +683,7 @@ final class GameScene: SKScene {
             }
         }
 
-        if shoutEvent { shoutCount += 1 }
-        loudestDB = max(loudestDB, level)
+        if jumpEvent { jumpCount += 1 }
 
         speed = min(Tune.maxSpeed, speed + Tune.speedRamp * dt)
         distance += speed * dt
@@ -754,20 +692,9 @@ final class GameScene: SKScene {
         moveDecor(dt)
     }
 
-    private func loudFraction() -> CGFloat {
-        let threshold = calib.jumpThresholdDB
-        let range = max(calib.shoutDB - threshold, 6)
-        return CGFloat(min(max((level - threshold) / range, 0), 1))
-    }
-
-    private func jumpVelocity(_ fraction: CGFloat) -> CGFloat {
-        Tune.jumpMin + (Tune.jumpMax - Tune.jumpMin) * fraction
-    }
-
-    private func startJump(_ fraction: CGFloat, _ now: TimeInterval) {
+    private func startJump() {
         airborne = true
-        jumpStart = now
-        jumpV = jumpVelocity(fraction)
+        jumpV = Tune.jumpSpeed
     }
 
     private func updatePlayer(_ dt: CGFloat, _ now: TimeInterval, allowJump: Bool) {
@@ -780,17 +707,10 @@ final class GameScene: SKScene {
         laneVel += ((goal - laneX) * 80 - laneVel * 18) * dt
         laneX += laneVel * dt
 
-        if allowJump && shoutEvent && !airborne { startJump(loudFraction(), now) }
+        if allowJump && jumpEvent && !airborne { startJump() }
 
         if airborne {
-            let loud = level > calib.jumpThresholdDB
-            // Tiếng hét thường to dần trong 0,2 giây đầu: cho cú nhảy mạnh thêm theo.
-            if hub.micReady && now - jumpStart < 0.2 {
-                let catchUp = jumpVelocity(loudFraction()) - Tune.gravity * CGFloat(now - jumpStart)
-                jumpV = max(jumpV, catchUp)
-            }
-            let g = (loud && jumpV > 0) ? Tune.heldGravity : Tune.gravity
-            jumpV -= g * dt
+            jumpV -= Tune.gravity * dt
             jumpY += jumpV * dt
             if jumpY <= 0 {
                 jumpY = 0
@@ -815,8 +735,6 @@ final class GameScene: SKScene {
         if !avatar.hasActions() {
             avatar.yScale = running ? 1 + sin(CGFloat(now) * 22) * 0.035 : 1
         }
-        playerShadow.position = CGPoint(x: x, y: groundY0)
-        playerShadow.setScale(1 / (1 + jumpY * 0.6))
 
         if now < invincibleUntil {
             player.alpha = Int(now * 10) % 2 == 0 ? 0.35 : 1
@@ -891,9 +809,8 @@ final class GameScene: SKScene {
             best = max(best, score)
             gameOverTime = now
             enter(.gameOver)
-            let louder = max(0, Int(loudestDB - calib.noiseDB))
             show("Hết ván! 🐾",
-                 "Điểm: \(score)   ·   Kỷ lục: \(best)\nSố lần hét: \(shoutCount)   ·   To nhất: +\(louder) dB\n\nHét thật to (hoặc chạm màn hình) để chơi lại")
+                 "Điểm: \(score)   ·   Kỷ lục: \(best)\nSố lần nhảy: \(jumpCount)\n\nNhảy lên (hoặc chạm màn hình) để chơi lại")
         }
     }
 
@@ -934,7 +851,7 @@ final class GameScene: SKScene {
         let p = touch.location(in: self)
         let now = CACurrentMediaTime()
         switch phase {
-        case .waiting, .calibStill, .calibLeft, .calibRight, .calibShout:
+        case .waiting, .calibStill, .calibLeft, .calibRight:
             guard avatarChosen else { return }
             touchMode = true
             startCountdown(resume: false)
@@ -943,7 +860,7 @@ final class GameScene: SKScene {
                 if p.x < size.width / 3 { targetLane = max(0, targetLane - 1); return }
                 if p.x > size.width * 2 / 3 { targetLane = min(2, targetLane + 1); return }
             }
-            if !airborne { startJump(0.5, now) }
+            if !airborne { startJump() }
         case .gameOver:
             guard now - gameOverTime > 1 else { return }
             if homeButton.frame.insetBy(dx: -40, dy: -20).contains(p) {
@@ -1017,13 +934,6 @@ final class GameScene: SKScene {
         } else {
             laneDot.isHidden = true
         }
-
-        let low = calib.noiseDB - 5
-        let high = max(calib.shoutDB, calib.jumpThresholdDB + 6) + 5
-        func barFraction(_ db: Float) -> CGFloat { CGFloat(min(max((db - low) / (high - low), 0), 1)) }
-        volumeFill.yScale = max(barFraction(level), 0.01)
-        volumeFill.color = level > calib.jumpThresholdDB ? .systemOrange : .systemGreen
-        volumeThreshold.position = CGPoint(x: 100, y: 120 + 300 * barFraction(calib.jumpThresholdDB))
     }
 
     // MARK: - Tiện ích
@@ -1036,11 +946,5 @@ final class GameScene: SKScene {
         guard !points.isEmpty else { return CGPoint(x: 0.5, y: 0.5) }
         let n = CGFloat(points.count)
         return CGPoint(x: points.map(\.x).reduce(0, +) / n, y: points.map(\.y).reduce(0, +) / n)
-    }
-
-    private func percentile(_ values: [Float], _ p: Float) -> Float {
-        guard !values.isEmpty else { return -50 }
-        let sorted = values.sorted()
-        return sorted[min(sorted.count - 1, Int(Float(sorted.count) * p))]
     }
 }

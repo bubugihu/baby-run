@@ -175,7 +175,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "bu học";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera dùng để nhận ra động tác của bạn (bước sang trái/phải, vung tay). Hình ảnh chỉ xử lý trên iPad, không gửi đi đâu.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Micro dùng để đo độ to tiếng hét để mèo nhảy. Âm thanh chỉ xử lý trên iPad, không ghi âm, không gửi đi đâu.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
@@ -205,7 +204,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "bu học";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Camera dùng để nhận ra động tác của bạn (bước sang trái/phải, vung tay). Hình ảnh chỉ xử lý trên iPad, không gửi đi đâu.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Micro dùng để đo độ to tiếng hét để mèo nhảy. Âm thanh chỉ xử lý trên iPad, không ghi âm, không gửi đi đâu.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
